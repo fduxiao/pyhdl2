@@ -2,8 +2,8 @@
 This module ensures binary operation. Since on a real-world device, each number is stored
 with a fixed bit-width. The arithmetic is exactly the one in the quotient ring. This module
 provides a python class of such a ring. Note that I treat every number as a `value`, i.e.,
-arithmetic operations will always give a new object of that class, even if the operands are unchanged,
-I will never return them.
+arithmetic operations will always give a new object of that class, even if the operands are
+unchanged, I will never return them.
 """
 
 from dataclasses import dataclass
@@ -40,6 +40,7 @@ class Shape:
             self.range = range(-max_value, max_value)
 
     def contains(self, item: int) -> bool:
+        """check whether a number is contained in this shape"""
         return item in self
 
     def __contains__(self, item: int):
@@ -48,8 +49,7 @@ class Shape:
     def __repr__(self):
         if self.signed:
             return f"Signed({self.n_bits})"
-        else:
-            return f"Unsigned({self.n_bits})"
+        return f"Unsigned({self.n_bits})"
 
     @classmethod
     def from_range(cls, iterable):
@@ -63,28 +63,31 @@ class Shape:
             maximal = max(maximal, k)
         if minimal >= 0:
             # all positive
-            if maximal == 0 or maximal == 1:
+            if maximal in {0, 1}:
                 return Unsigned(1)
             n_bits = math.floor(math.log2(maximal)) + 1
             return Unsigned(n_bits)
-        if minimal < 0:
-            if minimal == -1:
-                if maximal == 0 or maximal == 1:
-                    return Signed(2)
-                return Signed(math.ceil(math.log2(maximal + 1) + 1))
 
-            n_bits_neg = math.ceil(math.log2(-minimal)) + 1
-            if maximal <= 1:
-                return Signed(n_bits_neg)
-            n_bits_pos = math.ceil(math.log2(maximal + 1) + 1)
-            return Signed(max(n_bits_neg, n_bits_pos))
+        # minimal < 0
+        if minimal == -1:
+            if maximal in {0, 1}:
+                return Signed(2)
+            return Signed(math.ceil(math.log2(maximal + 1) + 1))
+
+        n_bits_neg = math.ceil(math.log2(-minimal)) + 1
+        if maximal <= 1:
+            return Signed(n_bits_neg)
+        n_bits_pos = math.ceil(math.log2(maximal + 1) + 1)
+        return Signed(max(n_bits_neg, n_bits_pos))
 
     @classmethod
     def from_enum(cls, enum):
+        """determine shape from an enum class"""
         return cls.from_range(map(lambda x: x.value, enum))
 
     @classmethod
     def from_n(cls, *args):
+        """determine shape from n values"""
         return cls.from_range(args)
 
     def value(self, n):
@@ -95,11 +98,13 @@ class Shape:
 
 
 class Signed(Shape):
+    """Signed integers. """
     def __init__(self, n_bit: int = 1):
         super().__init__(True, n_bit)
 
 
 class Unsigned(Shape):
+    """Unsigned integers. """
     def __init__(self, n_bit: int = 1):
         super().__init__(False, n_bit)
 
@@ -112,13 +117,13 @@ class Value:
     negative number (signed number) -1.
 
     In the implementation of this class, I will always use the positive remainder representation
-    of each residual class internally. That positive representative element is stored in the variable `_value`
-    and is therefore used for the ring arithmetic.
+    of each residual class internally. That positive representative element is stored in the
+    variable `_value` and is therefore used for the ring arithmetic.
 
     Then a property called `value` is used to access the desired result probably with sign.
 
-    I also implement other binary operations such as bitwise and, or, ..., and slicing through [high:low]
-    in the style of verilog (closed interval).
+    I also implement other binary operations such as bitwise and, or, ..., and slicing through
+    [high:low] in the style of verilog (closed interval).
     """
 
     _value: int
@@ -140,33 +145,41 @@ class Value:
 
     @property
     def signed(self):
+        """The sign of value"""
         return self.shape.signed
 
     @property
     def n_bits(self):
+        """The bit-width of value"""
         return self.shape.n_bits
 
     @property
     def min(self):
+        """The minimal possible value"""
         return self.shape.min
 
     @property
     def max(self):
+        """The maximal possible value"""
         return self.shape.max
 
     @property
     def modulo(self):
+        """The modulo of bit width"""
         return self.shape.modulo
 
     def copy(self):
+        """Copy self"""
         return type(self)(self._value, self.shape)
 
     @property
     def raw_value(self):
+        """The raw value"""
         return self._value
 
     @property
     def value(self):
+        """return the value"""
         value = self._value
         if value > self.max:
             value -= self.modulo
@@ -177,18 +190,17 @@ class Value:
         self.set_value(value)
 
     def set_value(self, value: int):
-        """
-        to set the correct value
-        """
+        """To set the correct value. """
         if isinstance(value, Value):
             value = value._value
         self._value = value % self.modulo
         return self
 
     def bin(self):
+        """Binary representation. """
         value = self._value
         result = ""
-        for i in range(self.n_bits):
+        for _i in range(self.n_bits):
             result += str(value & 0b1)
             value >>= 1
         return result[::-1]
@@ -197,6 +209,7 @@ class Value:
         return f"BitArray({self.value}, shape={self.shape})"
 
     def get_bit(self, index: int):
+        """Get the i-th bit."""
         if index < 0:
             index += self.n_bits
         if index < 0 or index >= self.n_bits:
@@ -205,10 +218,10 @@ class Value:
         value = self.value & mask
         if value > 0:
             return 1
-        else:
-            return 0
+        return 0
 
     def set_bit(self, key, value):
+        """Set the key-th bit to value"""
         if key < 0:
             key += self.n_bits
         if key < 0 or key >= self.n_bits:
@@ -220,6 +233,7 @@ class Value:
         self._value |= value
 
     def parse_slice(self, item):
+        """parse a slice as closed interval"""
         if isinstance(item, int):
             item = slice(item, item)
         stop = item.start
@@ -258,9 +272,10 @@ class Value:
         return Value(result_value, shape=Unsigned(bit_width))  # always unsigned
 
     def rev(self):
+        """reverse the value"""
         value = self.value
         result = 0
-        for i in range(self.n_bits):
+        for _i in range(self.n_bits):
             result <<= 1
             result |= value & 0b1
             value >>= 1
@@ -306,6 +321,14 @@ class Value:
         return self._value == 1
 
     def binary_op(self, other, func):
+        """
+        Perform a binary operation. This will check whether another is a
+        value or just an integer. Then perform `func` on it.
+
+        :param other: the other operand
+        :param func: the binary operator function
+        :return:
+        """
         if isinstance(other, Value):
             other = other.value
         return Value(func(self.value, other))
@@ -327,8 +350,15 @@ class Value:
         return self.binary_op(other, lambda x, y: x >= y)
 
     def binary_op_raw(self, other, func):
+        """
+        Perform binary operator but on the raw value.
+
+        :param other: the other operand
+        :param func: the binary operation function
+        :return:
+        """
         if isinstance(other, Value):
-            other = other._value
+            other = other.raw_value
         return Value(func(self._value, other))
 
     # arithmetics
