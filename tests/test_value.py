@@ -1,5 +1,5 @@
 from unittest import TestCase
-from pyhdl import Shape, Signed, Unsigned, Value
+from pyhdl import Shape, Signed, Unsigned, Value, Signal
 
 
 class TestValue(TestCase):
@@ -98,3 +98,15 @@ class TestValue(TestCase):
         a2 = Value(15)
         a3 = Value(4)
         self.assertEqual(a2 % a3, 3)
+
+    def test_signal(self):
+        s = Signal(4)
+        self.assertEqual(s.shape.n_bits, 3)
+        self.assertEqual(type(s).default_n_bits, None)
+
+        s = Signal[8](4)
+        self.assertEqual(s.shape.n_bits, 8)
+        self.assertEqual(type(s).default_n_bits, 8)
+
+        s = Signal[8](4, n_bits=6)
+        self.assertEqual(s.shape.n_bits, 6)
